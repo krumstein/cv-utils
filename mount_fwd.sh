@@ -19,8 +19,6 @@ if [  $# -lt 1 ]
 fi 
 PROJECTNUM=$1
 MNTPOINT=~/Work/CV/projects/${PROJECTNUM}/mnt
-echo "Creating directory for mount point"
-mkdir -p ${MNTPOINT}
 echo "Getting remote port"
 PORT=$(ssh sandbox /usr/local/bin/tun.sh | grep ${PROJECTNUM} | awk '{print $3}'| head -n 1)
 if [ -z ${PORT} ] 
@@ -32,6 +30,8 @@ echo "Checking if already mounted"
 mount | grep ${MNTPOINT}
 if [ $? -eq 1 ]
 then
+	echo "Creating directory for mount point"
+	mkdir -p ${MNTPOINT}
 	echo "Mounting"
 	sshfs -o ssh_command=~/Work/CV/cv-utils/jump_server  root@127.0.0.1:/ -p ${PORT} ${MNTPOINT}
 	if [ $? -eq 0 ]
@@ -41,7 +41,25 @@ then
 			echo "mount failed :("
 	fi
 else
-	echo "already mounted"
+	echo "Try to force unmount and mount? (Can help after a disconnect)"	
+	read OK
+	if [ ${OK} = "YES" ]
+	then
+		echo "trying to kill sshfs"
+		ps aux | grep sshfs | grep ${MNTPOINT} | awk '{print $2}' | xargs -I{} kill -9 {}
+		echo "trying to umount"
+		sudo umount ${MNTPOINT}
+		echo "trying to remount"
+		sshfs -o ssh_command=~/Work/CV/cv-utils/jump_server  root@127.0.0.1:/ -p ${PORT} ${MNTPOINT} -o reconnect
+		if [ $? -eq 0 ]
+			then
+				echo "mount success! You should be able to access files in ~/Work/CV/projects/${PROJECTNUM}/mnt/"
+			else
+				echo "mount failed :("
+	
+		fi
+	fi
+
 fi
 
 echo "trying to find a local port:"
